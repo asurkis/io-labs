@@ -1,12 +1,12 @@
+#include <linux/cdev.h>
+#include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/string.h>
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
+#include <linux/string.h>
 #include <linux/uaccess.h>
-#include <linux/cdev.h>
-#include <linux/fs.h>
 
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Anton Surkis");
@@ -42,12 +42,8 @@ static void print_int(int value) {
     result_text[result_len++] = print_buffer[pos++];
 }
 
-static ssize_t lab1_proc_read(
-    struct file *f,
-    char __user *ubuf,
-    size_t count,
-    loff_t *ppos)
-{
+static ssize_t lab1_proc_read(struct file *f, char __user *ubuf, size_t count,
+                              loff_t *ppos) {
   size_t len = result_len - *ppos;
   if (len > count)
     len = count;
@@ -57,24 +53,20 @@ static ssize_t lab1_proc_read(
   return len;
 }
 
-static ssize_t lab1_proc_write(struct file *f, const char __user *ubuf, size_t count, loff_t *ppos)
-{
+static ssize_t lab1_proc_write(struct file *f, const char __user *ubuf,
+                               size_t count, loff_t *ppos) {
   printk(KERN_DEBUG "Writing into /proc/" VARIANT_NAME " is unsupported\n");
   return -1;
 }
 
-static ssize_t lab1_dev_read(struct file *f, char __user *ubuf, size_t count, loff_t *ppos)
-{
+static ssize_t lab1_dev_read(struct file *f, char __user *ubuf, size_t count,
+                             loff_t *ppos) {
   printk(KERN_DEBUG "Reading from /dev/" VARIANT_NAME " is unsupported\n");
   return -1;
 }
 
-static ssize_t lab1_dev_write(
-  struct file *f,
-  const char __user *ubuf,
-  size_t count,
-  loff_t *ppos)
-{
+static ssize_t lab1_dev_write(struct file *f, const char __user *ubuf,
+                              size_t count, loff_t *ppos) {
   int sa = 0, sb = 0;
   int a = 0, b = 0;
   int running;
@@ -87,84 +79,87 @@ static ssize_t lab1_dev_write(
   for (running = 1; running && i < count; ++i) {
     char c = ubuf[i];
     switch (c) {
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        if (!sa)
-          sa = 1;
-        a = 10 * a + c - '0';
-        break;
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      if (!sa)
+        sa = 1;
+      a = 10 * a + c - '0';
+      break;
 
-      case '-':
-        if (!sa) {
-          sa = -1;
-          break;
-        }
-      case '+':
-      case '*':
-      case '/':
-        op = c;
-        running = 0;
+    case '-':
+      if (!sa) {
+        sa = -1;
         break;
+      }
+    case '+':
+    case '*':
+    case '/':
+      op = c;
+      running = 0;
+      break;
     }
   }
 
   for (running = 1; running && i < count; ++i) {
     char c = ubuf[i];
     switch (c) {
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        if (!sb)
-          sb = 1;
-        b = 10 * b + c - '0';
-        break;
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      if (!sb)
+        sb = 1;
+      b = 10 * b + c - '0';
+      break;
 
-      case '-':
-        if (!sb) {
-          sb = -1;
-          break;
-        }
+    case '-':
+      if (!sb) {
+        sb = -1;
+        break;
+      }
     }
   }
 
   a *= sa;
   b *= sb;
   switch (op) {
-    case '+':             print_int(a + b); break;
-    case '-':             print_int(a - b); break;
-    case '*':             print_int(a * b); break;
-    case '/': if (b != 0) print_int(a / b); break;
+  case '+':
+    print_int(a + b);
+    break;
+  case '-':
+    print_int(a - b);
+    break;
+  case '*':
+    print_int(a * b);
+    break;
+  case '/':
+    if (b != 0)
+      print_int(a / b);
+    break;
   }
-  
+
   return i;
 }
 
 static struct file_operations lab1_proc_fops = {
-    .owner = THIS_MODULE,
-    .read = lab1_proc_read,
-    .write = lab1_proc_write
-};
+    .owner = THIS_MODULE, .read = lab1_proc_read, .write = lab1_proc_write};
 
 static struct file_operations lab1_dev_fops = {
-    .owner = THIS_MODULE,
-    .read = lab1_dev_read,
-    .write = lab1_dev_write
-};
+    .owner = THIS_MODULE, .read = lab1_dev_read, .write = lab1_dev_write};
 
 static struct proc_dir_entry *lab1_proc_file = NULL;
 static struct cdev lab1_cdev;
@@ -187,4 +182,3 @@ static void __exit lab1_exit(void) {
 
 module_init(lab1_init);
 module_exit(lab1_exit);
-
