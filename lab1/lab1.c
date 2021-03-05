@@ -19,10 +19,11 @@ MODULE_VERSION("0.1");
 
 static char result_text[RESULT_BUFLEN + 1];
 static size_t result_len = 0;
+static int total_sum = 0;
+static char print_buffer[PRINT_BUFLEN];
+static size_t pos = PRINT_BUFLEN;
 
-static void print_int(int value) {
-  char print_buffer[PRINT_BUFLEN];
-  size_t pos = PRINT_BUFLEN;
+static void prepare_print_int(int value) {
   int negative = value < 0 ? 1 : 0;
   value = value < 0 ? -value : value;
   print_buffer[--pos] = ' ';
@@ -32,6 +33,11 @@ static void print_int(int value) {
   } while (value > 0);
   if (negative)
     print_buffer[--pos] = '-';
+}
+
+static void print_int(int value) {
+  total_sum += value;
+  prepare_print_int(value);
   if (result_len + PRINT_BUFLEN > pos + RESULT_BUFLEN)
     result_len = 0;
   while (pos < PRINT_BUFLEN)
@@ -51,8 +57,6 @@ static ssize_t lab1_proc_read(struct file *f, char __user *ubuf, size_t count,
 
 static ssize_t lab1_proc_write(struct file *f, const char __user *ubuf,
                                size_t count, loff_t *ppos) {
-  result_text[result_len] = 0;
-  printk(KERN_INFO "%s\n", result_text);
   return -1;
 }
 
@@ -153,18 +157,36 @@ static ssize_t lab1_dev_write(struct file *f, const char __user *ubuf,
   return i;
 }
 
+static ssize_t lab1_devsum_read(struct file *f, char __user *ubuf, size_t count,
+                                loff_t *ppos) {
+  size_t len;
+  prepare_print_int(total_sum);
+  len = PRINT_BUFLEN - pos;
+  if (*ppos != 0 || count < len)
+    return 0;
+  if (copy_to_user(ubuf, print_buffer + pos, len))
+    return -EFAULT;
+  *ppos += len;
+  return len;
+}
+
+static ssize_t lab1_devsum_write(struct file *f, const char __user *ubuf,
+                                 size_t count, loff_t *ppos) {
+  return -1;
+}
+
 static struct file_operations lab1_proc_fops = {
     .owner = THIS_MODULE, .read = lab1_proc_read, .write = lab1_proc_write};
 
 static struct file_operations lab1_dev_fops = {
     .owner = THIS_MODULE, .read = lab1_dev_read, .write = lab1_dev_write};
 
+static struct file_operations lab1_devsum_fops = {
+    .owner = THIS_MODULE, .read = lab1_devsum_read, .write = lab1_devsum_write};
+
 static struct proc_dir_entry *lab1_proc_file = NULL;
-/* #define DEV_MAJOR 137
-#define DEV_MINOR 137
-#define DEV MKDEV(DEV_MAJOR, DEV_MINOR) */
 static dev_t dev;
-static struct cdev lab1_cdev;
+static struct cdev lab1_cdev[2];
 static struct class *c1;
 
 static char *devnode(struct device *dev, umode_t *mode) {
@@ -174,7 +196,8 @@ static char *devnode(struct device *dev, umode_t *mode) {
 }
 
 static int __init lab1_init(void) {
-  int err = alloc_chrdev_region(&dev, 0, 1, "lab1_dev_driver");
+  int err = alloc_chrdev_region(&dev, 0, 2, "lab1_dev_driver");
+  printk(KERN_DEBUG "%d %d\n", dev, dev + 1);
   if (err < 0)
     return err;
   if ((c1 = class_create(THIS_MODULE, "lab1_dev_driver_class")) == NULL) {
@@ -184,11 +207,27 @@ static int __init lab1_init(void) {
   c1->devnode = devnode;
   if (device_create(c1, NULL, dev, NULL, "var2") == NULL) {
     class_destroy(c1);
+    unregister_chrdev_region(dev, 2);
+    return -1;
+  }
+  if (device_create(c1, NULL, dev + 1, NULL, "v2sum") == NULL) {
+    device_destroy(c1, dev);
+    class_destroy(c1);
     unregister_chrdev_region(dev, 1);
     return -1;
   }
-  cdev_init(&lab1_cdev, &lab1_dev_fops);
-  if (cdev_add(&lab1_cdev, dev, 1) < 0) {
+  cdev_init(&lab1_cdev[0], &lab1_dev_fops);
+  if (cdev_add(&lab1_cdev[0], dev, 2) < 0) {
+    device_destroy(c1, dev + 1);
+    device_destroy(c1, dev);
+    class_destroy(c1);
+    unregister_chrdev_region(dev, 1);
+    return -1;
+  }
+  cdev_init(&lab1_cdev[1], &lab1_devsum_fops);
+  if (cdev_add(&lab1_cdev[1], dev + 1, 2) < 0) {
+    cdev_del(&lab1_cdev[0]);
+    device_destroy(c1, dev + 1);
     device_destroy(c1, dev);
     class_destroy(c1);
     unregister_chrdev_region(dev, 1);
@@ -200,7 +239,9 @@ static int __init lab1_init(void) {
 
 static void __exit lab1_exit(void) {
   proc_remove(lab1_proc_file);
-  cdev_del(&lab1_cdev);
+  cdev_del(&lab1_cdev[1]);
+  cdev_del(&lab1_cdev[0]);
+  device_destroy(c1, dev + 1);
   device_destroy(c1, dev);
   class_destroy(c1);
   unregister_chrdev_region(dev, 1);
