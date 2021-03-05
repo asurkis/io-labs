@@ -8,7 +8,7 @@
 #include <linux/string.h>
 #include <linux/uaccess.h>
 
-MODULE_LICENSE("MIT");
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Anton Surkis");
 MODULE_DESCRIPTION("lab1");
 MODULE_VERSION("0.1");
@@ -16,9 +16,6 @@ MODULE_VERSION("0.1");
 #define VARIANT_NAME "var2"
 #define RESULT_BUFLEN 4095
 #define PRINT_BUFLEN 12
-#define DEV_MAJOR 137
-#define DEV_MINOR 137
-#define DEV MKDEV(DEV_MAJOR, DEV_MINOR)
 
 static char result_text[RESULT_BUFLEN + 1];
 static size_t result_len = 0;
@@ -27,7 +24,6 @@ static void print_int(int value) {
   char print_buffer[PRINT_BUFLEN];
   size_t pos = PRINT_BUFLEN;
   int negative = value < 0 ? 1 : 0;
-  // printk(KERN_INFO "Printing number: %d\n", value);
   value = value < 0 ? -value : value;
   print_buffer[--pos] = ' ';
   do {
@@ -164,14 +160,40 @@ static struct file_operations lab1_dev_fops = {
     .owner = THIS_MODULE, .read = lab1_dev_read, .write = lab1_dev_write};
 
 static struct proc_dir_entry *lab1_proc_file = NULL;
+/* #define DEV_MAJOR 137
+#define DEV_MINOR 137
+#define DEV MKDEV(DEV_MAJOR, DEV_MINOR) */
+static dev_t dev;
 static struct cdev lab1_cdev;
+static struct class *c1;
+
+static char *devnode(struct device *dev, umode_t *mode) {
+  if (mode)
+    *mode = 0666;
+  return NULL;
+}
 
 static int __init lab1_init(void) {
-  int err = register_chrdev_region(DEV, 1, "lab1_dev_driver");
-  if (err)
+  int err = alloc_chrdev_region(&dev, 0, 1, "lab1_dev_driver");
+  if (err < 0)
     return err;
+  if ((c1 = class_create(THIS_MODULE, "lab1_dev_driver_class")) == NULL) {
+    unregister_chrdev_region(dev, 1);
+    return -1;
+  }
+  c1->devnode = devnode;
+  if (device_create(c1, NULL, dev, NULL, "var2") == NULL) {
+    class_destroy(c1);
+    unregister_chrdev_region(dev, 1);
+    return -1;
+  }
   cdev_init(&lab1_cdev, &lab1_dev_fops);
-  cdev_add(&lab1_cdev, DEV, 1);
+  if (cdev_add(&lab1_cdev, dev, 1) < 0) {
+    device_destroy(c1, dev);
+    class_destroy(c1);
+    unregister_chrdev_region(dev, 1);
+    return -1;
+  }
   lab1_proc_file = proc_create("var2", 0444, NULL, &lab1_proc_fops);
   return 0;
 }
@@ -179,7 +201,9 @@ static int __init lab1_init(void) {
 static void __exit lab1_exit(void) {
   proc_remove(lab1_proc_file);
   cdev_del(&lab1_cdev);
-  unregister_chrdev_region(DEV, 1);
+  device_destroy(c1, dev);
+  class_destroy(c1);
+  unregister_chrdev_region(dev, 1);
 }
 
 module_init(lab1_init);
