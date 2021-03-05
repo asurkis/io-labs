@@ -14,20 +14,20 @@ MODULE_DESCRIPTION("lab1");
 MODULE_VERSION("0.1");
 
 #define VARIANT_NAME "var2"
-#define RESULT_BUFLEN 4096
+#define RESULT_BUFLEN 4095
 #define PRINT_BUFLEN 12
 #define DEV_MAJOR 137
 #define DEV_MINOR 137
 #define DEV MKDEV(DEV_MAJOR, DEV_MINOR)
 
-static char result_text[RESULT_BUFLEN];
+static char result_text[RESULT_BUFLEN + 1];
 static size_t result_len = 0;
 
 static void print_int(int value) {
   char print_buffer[PRINT_BUFLEN];
   size_t pos = PRINT_BUFLEN;
   int negative = value < 0 ? 1 : 0;
-  printk(KERN_INFO "Printing number: %d\n", value);
+  // printk(KERN_INFO "Printing number: %d\n", value);
   value = value < 0 ? -value : value;
   print_buffer[--pos] = ' ';
   do {
@@ -55,14 +55,16 @@ static ssize_t lab1_proc_read(struct file *f, char __user *ubuf, size_t count,
 
 static ssize_t lab1_proc_write(struct file *f, const char __user *ubuf,
                                size_t count, loff_t *ppos) {
-  printk(KERN_DEBUG "Writing into /proc/" VARIANT_NAME " is unsupported\n");
+  result_text[result_len] = 0;
+  printk(KERN_INFO "%s\n", result_text);
   return -1;
 }
 
 static ssize_t lab1_dev_read(struct file *f, char __user *ubuf, size_t count,
                              loff_t *ppos) {
-  printk(KERN_DEBUG "Reading from /dev/" VARIANT_NAME " is unsupported\n");
-  return -1;
+  result_text[result_len] = 0;
+  printk(KERN_INFO "%s\n", result_text);
+  return 0;
 }
 
 static ssize_t lab1_dev_write(struct file *f, const char __user *ubuf,
@@ -182,3 +184,4 @@ static void __exit lab1_exit(void) {
 
 module_init(lab1_init);
 module_exit(lab1_exit);
+
