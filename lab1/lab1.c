@@ -261,6 +261,7 @@ static int __init lab1_init(void) {
     PRE_EXIT;
     return -1;
   }
+  ++init_stage;
 
   lab1_proc_file = proc_create("var2", 0444, NULL, &lab1_proc_fops);
   if (!lab1_proc_file) {
