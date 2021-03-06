@@ -226,7 +226,6 @@ static int init_stage = 0;
 
 static int __init lab1_init(void) {
   int err = alloc_chrdev_region(&dev, 0, 2, "lab1_dev_driver");
-  printk(KERN_DEBUG "%d %d\n", dev, dev + 1);
   if (err < 0)
     return err;
   ++init_stage;
