@@ -26,6 +26,7 @@ static size_t pos = PRINT_BUFLEN;
 static void prepare_print_int(int value) {
   int negative = value < 0 ? 1 : 0;
   value = value < 0 ? -value : value;
+  pos = PRINT_BUFLEN;
   print_buffer[--pos] = ' ';
   do {
     print_buffer[--pos] = '0' + value % 10;
