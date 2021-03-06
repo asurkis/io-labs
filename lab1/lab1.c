@@ -212,6 +212,7 @@ static void free_resources(int stage) {
   case 1:
     unregister_chrdev_region(dev, 2);
   case 0:
+    break;
   }
 }
 
