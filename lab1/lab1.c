@@ -195,58 +195,83 @@ static char *devnode(struct device *dev, umode_t *mode) {
   return NULL;
 }
 
+static void free_resources(int stage) {
+  switch (stage) {
+  case 7:
+    proc_remove(lab1_proc_file);
+  case 6:
+    cdev_del(&lab1_cdev[1]);
+  case 5:
+    cdev_del(&lab1_cdev[0]);
+  case 4:
+    device_destroy(c1, dev + 1);
+  case 3:
+    device_destroy(c1, dev);
+  case 2:
+    class_destroy(c1);
+  case 1:
+    unregister_chrdev_region(dev, 2);
+  case 0:
+  }
+}
+
+static int init_stage = 0;
+#define PRE_EXIT                                                               \
+  do {                                                                         \
+    free_resources(init_stage);                                                \
+    init_stage = 0;                                                            \
+  } while (0)
+
 static int __init lab1_init(void) {
   int err = alloc_chrdev_region(&dev, 0, 2, "lab1_dev_driver");
   printk(KERN_DEBUG "%d %d\n", dev, dev + 1);
   if (err < 0)
     return err;
+  ++init_stage;
+
   if ((c1 = class_create(THIS_MODULE, "lab1_dev_driver_class")) == NULL) {
-    unregister_chrdev_region(dev, 1);
+    PRE_EXIT;
     return -1;
   }
+  ++init_stage;
+
   c1->devnode = devnode;
-  if (device_create(c1, NULL, dev, NULL, "var2") == NULL) {
-    class_destroy(c1);
-    unregister_chrdev_region(dev, 2);
+  if (device_create(c1, NULL, dev, NULL, VARIANT_NAME) == NULL) {
+    PRE_EXIT;
     return -1;
   }
-  if (device_create(c1, NULL, dev + 1, NULL, "v2sum") == NULL) {
-    device_destroy(c1, dev);
-    class_destroy(c1);
-    unregister_chrdev_region(dev, 1);
+  ++init_stage;
+
+  if (device_create(c1, NULL, dev + 1, NULL, VARIANT_NAME "sum") == NULL) {
+    PRE_EXIT;
     return -1;
   }
+  ++init_stage;
+
   cdev_init(&lab1_cdev[0], &lab1_dev_fops);
   if (cdev_add(&lab1_cdev[0], dev, 2) < 0) {
-    device_destroy(c1, dev + 1);
-    device_destroy(c1, dev);
-    class_destroy(c1);
-    unregister_chrdev_region(dev, 1);
+    PRE_EXIT;
     return -1;
   }
+  ++init_stage;
+
   cdev_init(&lab1_cdev[1], &lab1_devsum_fops);
   if (cdev_add(&lab1_cdev[1], dev + 1, 2) < 0) {
-    cdev_del(&lab1_cdev[0]);
-    device_destroy(c1, dev + 1);
-    device_destroy(c1, dev);
-    class_destroy(c1);
-    unregister_chrdev_region(dev, 1);
+    PRE_EXIT;
     return -1;
   }
+
   lab1_proc_file = proc_create("var2", 0444, NULL, &lab1_proc_fops);
+  if (!lab1_proc_file) {
+    PRE_EXIT;
+    return -1;
+  }
+  ++init_stage;
+
   return 0;
 }
 
-static void __exit lab1_exit(void) {
-  proc_remove(lab1_proc_file);
-  cdev_del(&lab1_cdev[1]);
-  cdev_del(&lab1_cdev[0]);
-  device_destroy(c1, dev + 1);
-  device_destroy(c1, dev);
-  class_destroy(c1);
-  unregister_chrdev_region(dev, 1);
-}
+static void __exit lab1_exit(void) { PRE_EXIT; }
 
 module_init(lab1_init);
 module_exit(lab1_exit);
-
