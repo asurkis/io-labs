@@ -1,5 +1,3 @@
 .vscode
 lab1/*
-!lab1/lab1.c
-!lab1/Makefile
-!lab1/README.md
+lab2/*
