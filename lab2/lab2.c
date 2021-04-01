@@ -17,12 +17,10 @@ MODULE_VERSION("0.1");
 
 #define MY_BLKDEV_NAME "lab2dev"
 #define MY_DISK_NAME "lab2_disk_name"
-#define MY_SECTORS (5 * 1024 * 1024 / 512)
-#define MY_KERNEL_SECTOR_SIZE 512
+#define MY_SECTORS (5 * 1024 * 1024 / SECTOR_SIZE)
+#define MY_BLOCK_MINORS 1
 
 static int init_stage;
-
-#define MY_BLOCK_MINORS 1
 
 static struct my_block_dev {
   int block_major;
@@ -36,7 +34,23 @@ static int my_block_open(struct block_device *dev, fmode_t mode) { return 0; }
 
 static void my_block_release(struct gendisk *gd, fmode_t mode) {}
 
-static void my_block_request(struct request_queue *queue) {}
+static void my_block_request(struct request_queue *queue) {
+  struct request *rq;
+  struct my_block_dev *dev = queue->queuedata;
+  for (;;) {
+    rq = blk_fetch_request(queue);
+    if (!rq)
+      break;
+
+    if (blk_rq_is_passthrough(rq)) {
+      printk(KERN_NOTICE "Skip non-fs request\n");
+      __blk_end_request_all(rq, -EIO);
+      continue;
+    }
+
+    __blk_end_request_all(rq, 0);
+  }
+}
 
 struct block_device_operations my_fops = {
     .owner = THIS_MODULE, .open = my_block_open, .release = my_block_release};
@@ -46,7 +60,7 @@ static int init_queue(struct my_block_dev *dev) {
   dev->queue = blk_init_queue(my_block_request, &dev->lock);
   if (!dev->queue)
     return -1;
-  blk_queue_logical_block_size(dev->queue, MY_KERNEL_SECTOR_SIZE);
+  blk_queue_logical_block_size(dev->queue, SECTOR_SIZE);
   dev->queue->queuedata = dev;
   return 0;
 }
