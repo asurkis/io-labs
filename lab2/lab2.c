@@ -34,9 +34,9 @@ static struct my_block_dev {
 
 static int my_block_open(struct block_device *dev, fmode_t mode) { return 0; }
 
-static int my_block_release(struct gendisk *gd, fmode_t mode) { return 0; }
+static void my_block_release(struct gendisk *gd, fmode_t mode) {}
 
-static int my_block_request(struct request_queue *queue, spinlock_t *lock) { return 0; }
+static void my_block_request(struct request_queue *queue) {}
 
 struct block_device_operations my_fops = {
     .owner = THIS_MODULE, .open = my_block_open, .release = my_block_release};
