@@ -20,24 +20,24 @@
 1. `fdisk -l` - просмотр разделов диска.
 2. Форматирование разделов диска:
 ```
-   mkfs.vfat /dev/mydisk1
-   mkfs.vfat /dev/mydisk2
-   mkfs.vfat /dev/mydisk5
-   mkfs.vfat /dev/mydisk6
+mkfs.vfat /dev/mydisk1
+mkfs.vfat /dev/mydisk2
+mkfs.vfat /dev/mydisk5
+mkfs.vfat /dev/mydisk6
 ```
 3. Создание директорий и монтирование разделов диска, где N - номер раздела:
 ```
-   mkdir /mnt/myN
-   mount /dev/mydiskN /mnt/myN
+mkdir /mnt/myN
+mount /dev/mydiskN /mnt/myN
 ```
 4. `dd if=/dev/urandom of=/mnt/myN/test bs=1M count=9` - заполнение тестового файла случайными данными.
 5. `dd if=/mnt/myN/test of=/mnt/myM/test` - копирование файлов между разделами созданного виртуального диска, где N, M - разделы диска. 
 6. `dd if=/mnt/myN/test of=/mnt/test` - копирование файлов между разделами виртуального и реального жестких дисков.
 7. Удаление созданных файлов и размонтирование разделов:
 ```
-   rm /mnt/myN/test
-   rm /mnt/test
-   umount /mnt/myN
+rm /mnt/myN/test
+rm /mnt/test
+umount /mnt/myN
 ```
 
 ## Примеры использования
