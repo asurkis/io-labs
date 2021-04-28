@@ -9,9 +9,6 @@
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 
-#define MEMSIZE 0xF000          // Size of Ram disk in sectors
-static int my_major_number = 0; // Variable for Major Number
-
 // #define SECTOR_SIZE 512
 #define MBR_SIZE SECTOR_SIZE
 #define MBR_DISK_SIGNATURE_OFFSET 440
@@ -53,67 +50,106 @@ typedef PartEntry PartTable[4];
 #define head4size(s) (((s) % CYL_SIZE) / HEAD_SIZE)
 #define cyl4size(s) ((s) / CYL_SIZE)
 
-static PartTable def_part_table = {{
-                                     boot_type : 0x00,
-                                     start_sec : 0x2,
-                                     start_head : 0x0,
-                                     start_cyl : 0x0,
-                                     part_type : 0x83,
-                                     end_head : 0x3,
-                                     end_sec : 0x20,
-                                     end_cyl : 0x9F,
-                                     abs_start_sec : 0x1,
-                                     sec_in_part : 0x4FFF // 10Mbyte
-                                   },
-                                   {
-                                     boot_type : 0x00,
-                                     start_head : 0x4,
-                                     start_sec : 0x1,
-                                     start_cyl : 0x0,
-                                     part_type :
-                                         0x05, // extended partition type
-                                     end_sec : 0x20,
-                                     end_head : 0xB,
-                                     end_cyl : 0x9F,
-                                     abs_start_sec : 0x5000,
-                                     sec_in_part : 0xA000
-                                   }};
-static unsigned int def_log_part_br_abs_start_sector[] = {0x5000, 0xA000};
+#define PART1_SIZE 0x5000
+#define PART2_SIZE 0xA000
+#define PART3_SIZE 0xA000
+#define PART31_SIZE 0x5000
+#define PART32_SIZE 0x5000
+
+#define MEMSIZE                                                                \
+  (PART1_SIZE + PART2_SIZE + PART3_SIZE + 3) // Size of Ram disk in sectors
+static int my_major_number = 0;              // Variable for Major Number
+
+static PartTable def_part_table = {
+    {
+      boot_type : 0x00,
+      start_sec : 0x1,
+      start_head : 0x0,
+      start_cyl_hi : 0x0,
+      start_cyl : 0x0,
+      part_type : 0x83,
+      end_head : 0,   // head4size(PART1_SIZE - 1),
+      end_sec : 0,    // sec4size(PART1_SIZE - 1) + 1,
+      end_cyl_hi : 0, // (cyl4size(PART1_SIZE - 1) >> 8) & 0x3,
+      end_cyl : 0,    // cyl4size(PART1_SIZE - 1) & 0xFF,
+      abs_start_sec : 0x1,
+      sec_in_part : PART1_SIZE
+    },
+    {
+      boot_type : 0x00,
+      start_head : 0,   // head4size(PART1_SIZE),
+      start_sec : 0,    // sec4size(PART1_SIZE) + 1,
+      start_cyl_hi : 0, // (cyl4size(PART1_SIZE) >> 8) & 0x3,
+      start_cyl : 0,    // cyl4size(PART1_SIZE) & 0xFF,
+      part_type : 0x83,
+      end_sec : 0,    // sec4size(PART1_SIZE + PART2_SIZE - 1) + 1,
+      end_head : 0,   // head4size(PART1_SIZE + PART2_SIZE - 1),
+      end_cyl_hi : 0, // (cyl4size(PART1_SIZE + PART2_SIZE - 1) >> 8) & 0x3,
+      end_cyl : 0,    // cyl4size(PART1_SIZE + PART2_SIZE - 1) & 0xFF,
+      abs_start_sec : PART1_SIZE + 1,
+      sec_in_part : PART2_SIZE
+    },
+    {
+      boot_type : 0x00,
+      start_head : 0,   // head4size(PART1_SIZE + PART2_SIZE),
+      start_sec : 0,    // sec4size(PART1_SIZE + PART2_SIZE) + 1,
+      start_cyl_hi : 0, // (cyl4size(PART1_SIZE + PART2_SIZE) >> 8) & 0x3,
+      start_cyl : 0,    // cyl4size(PART1_SIZE + PART2_SIZE) & 0xFF,
+      part_type : 0x05,
+      end_sec : 0,    // sec4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1) + 1,
+      end_head : 0,   // head4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1),
+      end_cyl_hi : 0, // (cyl4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1)
+                      // >> 8) & 0x3,
+      end_cyl : 0, // cyl4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1) & 0xFF,
+      abs_start_sec : PART1_SIZE + PART2_SIZE + 1,
+      sec_in_part : PART3_SIZE + 2
+    }};
+
+static unsigned int def_log_part_br_abs_start_sector[] = {
+    PART1_SIZE + PART2_SIZE + 1,
+    PART1_SIZE + PART2_SIZE + PART31_SIZE + 2,
+};
 static const PartTable def_log_part_table[] = {{{
                                                   boot_type : 0x00,
-                                                  start_head : 0x4,
-                                                  start_sec : 0x2,
-                                                  start_cyl : 0x0,
+                                                  start_head : 0,
+                                                  start_sec : 0,
+                                                  start_cyl_hi : 0,
+                                                  start_cyl : 0,
                                                   part_type : 0x83,
-                                                  end_head : 0x7,
-                                                  end_sec : 0x20,
-                                                  end_cyl : 0x9F,
+                                                  end_sec : 0,
+                                                  end_head : 0,
+                                                  end_cyl_hi : 0,
+                                                  end_cyl : 0,
                                                   abs_start_sec : 0x1,
-                                                  sec_in_part : 0x4FFF
+                                                  sec_in_part : PART31_SIZE
                                                 },
                                                 {
                                                   boot_type : 0x00,
-                                                  start_head : 0x8,
-                                                  start_sec : 0x01,
-                                                  start_cyl : 0x00,
+                                                  start_head : 0,
+                                                  start_sec : 0,
+                                                  start_cyl_hi : 0,
+                                                  start_cyl : 0,
                                                   part_type : 0x05,
-                                                  end_head : 0xB,
-                                                  end_sec : 0x20,
-                                                  end_cyl : 0x9F,
-                                                  abs_start_sec : 0x5000,
-                                                  sec_in_part : 0x5000
+                                                  end_sec : 0,
+                                                  end_head : 0,
+                                                  end_cyl_hi : 0,
+                                                  end_cyl : 0,
+                                                  abs_start_sec : PART31_SIZE + 1,
+                                                  sec_in_part : PART32_SIZE
                                                 }},
                                                {{
                                                  boot_type : 0x00,
-                                                 start_head : 0x8,
-                                                 start_sec : 0x02,
-                                                 start_cyl : 0x00,
+                                                 start_head : 0,
+                                                 start_sec : 0,
+                                                 start_cyl_hi : 0,
+                                                 start_cyl : 0,
                                                  part_type : 0x83,
-                                                 end_head : 0xB,
-                                                 end_sec : 0x20,
-                                                 end_cyl : 0x9F,
+                                                 end_sec : 0,
+                                                 end_head : 0,
+                                                 end_cyl_hi : 0,
+                                                 end_cyl : 0,
                                                  abs_start_sec : 0x1,
-                                                 sec_in_part : 0x4FFF
+                                                 sec_in_part : PART32_SIZE
                                                }}};
 
 static void copy_mbr(u8 *disk) {
@@ -174,15 +210,11 @@ int mydisk_init(void) {
 static int rb_transfer(struct request *req) {
   int dir = rq_data_dir(req);
   int ret = 0;
-  /*starting sector
-   *where to do operation*/
+  /*starting sector where to do operation*/
   sector_t start_sector = blk_rq_pos(req);
   /* no of sector on which opn to be done*/
   unsigned int sector_cnt = blk_rq_sectors(req);
   struct bio_vec bv;
-#define BV_PAGE(bv) ((bv).bv_page)
-#define BV_OFFSET(bv) ((bv).bv_offset)
-#define BV_LEN(bv) ((bv).bv_len)
   struct req_iterator iter;
   sector_t sector_offset;
   unsigned int sectors;
@@ -191,12 +223,12 @@ static int rb_transfer(struct request *req) {
   rq_for_each_segment(bv, req, iter) {
     void *disk_data_ptr =
         device.data + ((start_sector + sector_offset) * SECTOR_SIZE);
-    buffer = page_address(BV_PAGE(bv)) + BV_OFFSET(bv);
-    if (BV_LEN(bv) % (SECTOR_SIZE) != 0) {
+    buffer = page_address(bv.bv_page) + bv.bv_offset;
+    if (bv.bv_len % (SECTOR_SIZE) != 0) {
       printk(KERN_ERR "bio size is not a multiple ofsector size\n");
       ret = -EIO;
     }
-    sectors = BV_LEN(bv) / SECTOR_SIZE;
+    sectors = bv.bv_len / SECTOR_SIZE;
     printk(KERN_DEBUG "my disk: Start Sector: %llu, Sector Offset: %llu;\n"
                       "Buffer: %p; Length: %u sectors\n",
            (unsigned long long)start_sector, (unsigned long long)sector_offset,
@@ -221,9 +253,8 @@ static int rb_transfer(struct request *req) {
 static void dev_request(struct request_queue *q) {
   struct request *req;
   int error;
-  while ((req = blk_fetch_request(q)) != NULL) /*check active request
-                                                *for data transfer*/
-  {
+  /*check active request for data transfer*/
+  while ((req = blk_fetch_request(q)) != NULL) {
     error = rb_transfer(req);          // transfer the request for operation
     __blk_end_request_all(req, error); // end the request
   }
@@ -237,26 +268,23 @@ void device_setup(void) {
   spin_lock_init(&device.lock); // lock for queue
   device.queue = blk_init_queue(dev_request, &device.lock);
 
-  device.gd = alloc_disk(8); // gendisk allocation
-
-  (device.gd)->major = my_major_number; // major no to gendisk
-  device.gd->first_minor = 0;           // first minor of gendisk
+  device.gd = alloc_disk(8);          // gendisk allocation
+  device.gd->major = my_major_number; // major no to gendisk
+  device.gd->first_minor = 0;         // first minor of gendisk
 
   device.gd->fops = &fops;
   device.gd->private_data = &device;
   device.gd->queue = device.queue;
   device.size = mydisk_init();
   printk(KERN_INFO "THIS IS DEVICE SIZE %d", device.size);
-  sprintf(((device.gd)->disk_name), "mydisk");
+  sprintf(device.gd->disk_name, "mydisk");
   set_capacity(device.gd, device.size);
   add_disk(device.gd);
 }
 
 static int __init mydiskdrive_init(void) {
-  int ret = 0;
   device_setup();
-
-  return ret;
+  return 0;
 }
 
 void mydisk_cleanup(void) { vfree(device.data); }
@@ -272,5 +300,5 @@ void __exit mydiskdrive_exit(void) {
 module_init(mydiskdrive_init);
 module_exit(mydiskdrive_exit);
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Author");
-MODULE_DESCRIPTION("BLOCK DRIVER");
+MODULE_AUTHOR("Anton Surkis");
+MODULE_DESCRIPTION("Lab2");
