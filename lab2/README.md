@@ -42,13 +42,14 @@ umount /mnt/myN
 
 ## Примеры использования
 
-```
-Device Boot Start End Sectors Size Id Type
-/dev/mydisk1 1 20480 20480 10M 83 Linux
-/dev/mydisk2 20481 61440 40960 20M 83 Linux
-/dev/mydisk3 61441 102402 40962 20M 5 Extended
-/dev/mydisk5 61442 81921 20480 10M 83 Linux
-/dev/mydisk6 81923 102402 20480 10M 83 Linux
+`fdisk -l`
 
+```
+Device        Boot    Start     End     Sectors   Size  Id  Type
+/dev/mydisk1            1      20480     20480    10M   83  Linux
+/dev/mydisk2          20481    61440     40960    20M   83  Linux
+/dev/mydisk3          61441   102402     40962    20M    5  Extended
+/dev/mydisk5          61442    81921     20480    10M   83  Linux
+/dev/mydisk6          81923   102402     20480    10M   83  Linux
 
 ```
