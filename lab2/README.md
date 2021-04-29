@@ -30,13 +30,19 @@ mkfs.vfat /dev/mydisk6
 mkdir /mnt/myN
 mount /dev/mydiskN /mnt/myN
 ```
-4. `dd if=/dev/urandom of=/mnt/myN/test bs=1M count=9` - заполнение тестового файла случайными данными.
-5. `dd if=/mnt/myN/test of=/mnt/myM/test` - копирование файлов между разделами созданного виртуального диска, где N, M - разделы диска. 
-6. `dd if=/mnt/myN/test of=/mnt/test` - копирование файлов между разделами виртуального и реального жестких дисков.
-7. Удаление созданных файлов и размонтирование разделов:
+4. `dd if=/dev/urandom of=testN.dat count=$[ 9 * 1024 ]` - заполнение тестовых файла случайными данными.
+5. Копирование файлов между разделами виртуального и реального жестких дисков:
 ```
-rm /mnt/myN/test
-rm /mnt/test
+cp test*.dat /mnt/myN
+mkdir testback
+cp /mnt/myN/test*.dat testback/dN
+```
+7. `cp /mnt/myN/test*.dat /mnt/myM` - копирование файлов между разделами созданного виртуального диска, где N, M - разделы диска. 
+8. Удаление созданных файлов и размонтирование разделов:
+```
+rm *.dat
+rm -r testback
+rm /mnt/myN/*.dat
 umount /mnt/myN
 ```
 
@@ -53,27 +59,38 @@ Device        Boot    Start     End     Sectors   Size  Id  Type
 /dev/mydisk6          81923   102402     20480    10M   83  Linux
 
 ```
-`time dd if=/dev/urandom of=/dev/mydisk1 bs=1M count=9`
+`time cp test*.dat /mnt/my1`
 
 ```
-9+0 records in
-9+0 records out
-9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,152178 s, 62,0 MB/s
-0.00 user 0.13 system 0:00.15 elapsed
+real    0m0,013s
+user    0m0,000s
+sys     0m0,012s
 ```
-`time dd if=/dev/mydisk1 of=/dev/mydisk5 bs=1M count=9`
+`time cp /mnt/my1/test*.dat testback/d1`
 
 ```
-9+0 records in
-9+0 records out
-9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,0485345 s, 194 MB/s
-0.00 user 0.01 system 0:00.06 elapsed
+real    0m0,018s
+user    0m0,000s
+sys     0m0,018s
 ```
-`time dd if=/dev/mydisk5 of=/tmp/lol bs=1M count=9`
+`time cp /mnt/my1/test*.dat /mnt/my2`
 
 ```
-9+0 records in
-9+0 records out
-9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,0658127 s, 143 MB/s
-0.00 user 0.01 system 0:00.07 elapsed
+real    0m0,012s
+user    0m0,000s
+sys     0m0,012s
+```
+`time cp /mnt/my2/test*.dat /mnt/my5`
+
+```
+real    0m0,025s
+user    0m0,004s
+sys     0m0,021s
+```
+`time cp /mnt/my5/test*.dat /mnt/my6`
+
+```
+real    0m0,013s
+user    0m0,000s
+sys     0m0,013s
 ```
