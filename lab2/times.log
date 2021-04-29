@@ -1,0 +1,60 @@
+root@stud-VirtualBox:~# for i in 1 2; do dd if=/dev/urandom of=test$i.dat count=$[ 9 * 1024 ]; done
+9216+0 records in
+9216+0 records out
+4718592 bytes (4,7 MB, 4,5 MiB) copied, 0,0913524 s, 51,7 MB/s
+9216+0 records in
+9216+0 records out
+4718592 bytes (4,7 MB, 4,5 MiB) copied, 0,0910201 s, 51,8 MB/s
+root@stud-VirtualBox:~# for i in 1 2 5 6; do time cp test*.dat /mnt/my$i; done
+
+real    0m0,013s
+user    0m0,000s
+sys     0m0,012s
+
+real    0m0,016s
+user    0m0,000s
+sys     0m0,016s
+
+real    0m0,031s
+user    0m0,001s
+sys     0m0,030s
+
+real    0m0,012s
+user    0m0,000s
+sys     0m0,011s
+root@stud-VirtualBox:~# mkdir testback
+root@stud-VirtualBox:~# for i in 1 2 5 6; do mkdir testback/d$i; done
+root@stud-VirtualBox:~# for i in 1 2 5 6; do time cp /mnt/my$i/test*.dat testback/d$i; done
+
+real    0m0,018s
+user    0m0,000s
+sys     0m0,018s
+
+real    0m0,014s
+user    0m0,001s
+sys     0m0,014s
+
+real    0m0,022s
+user    0m0,001s
+sys     0m0,021s
+
+real    0m0,008s
+user    0m0,000s
+sys     0m0,008s
+root@stud-VirtualBox:~# rm /mnt/my*/*
+root@stud-VirtualBox:~# cp test*.dat /mnt/my1
+root@stud-VirtualBox:~# time cp /mnt/my1/test*.dat /mnt/my2
+
+real    0m0,012s
+user    0m0,000s
+sys     0m0,012s
+root@stud-VirtualBox:~# time cp /mnt/my2/test*.dat /mnt/my5
+
+real    0m0,025s
+user    0m0,004s
+sys     0m0,021s
+root@stud-VirtualBox:~# time cp /mnt/my5/test*.dat /mnt/my6
+
+real    0m0,013s
+user    0m0,000s
+sys     0m0,013s
