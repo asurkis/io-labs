@@ -53,3 +53,27 @@ Device        Boot    Start     End     Sectors   Size  Id  Type
 /dev/mydisk6          81923   102402     20480    10M   83  Linux
 
 ```
+`time dd if=/dev/urandom of=/dev/mydisk1 bs=1M count=9`
+
+```
+9+0 records in
+9+0 records out
+9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,152178 s, 62,0 MB/s
+0.00 user 0.13 system 0:00.15 elapsed
+```
+`time dd if=/dev/mydisk1 of=/dev/mydisk5 bs=1M count=9`
+
+```
+9+0 records in
+9+0 records out
+9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,0485345 s, 194 MB/s
+0.00 user 0.01 system 0:00.06 elapsed
+```
+`time dd if=/dev/mydisk5 of=/tmp/lol bs=1M count=9`
+
+```
+9+0 records in
+9+0 records out
+9437184 bytes (9,4 MB, 9,0 MiB) copied, 0,0658127 s, 143 MB/s
+0.00 user 0.01 system 0:00.07 elapsed
+```
