@@ -50,14 +50,14 @@ typedef PartEntry PartTable[4];
 #define head4size(s) (((s) % CYL_SIZE) / HEAD_SIZE)
 #define cyl4size(s) ((s) / CYL_SIZE)
 
-#define PART1_SIZE 0x5000
-#define PART2_SIZE 0xA000
-#define PART3_SIZE 0xA000
-#define PART31_SIZE 0x5000
-#define PART32_SIZE 0x5000
+#define PART1_SIZE (10 * 2 * 1024)
+#define PART2_SIZE (25 * 2 * 1024)
+#define PART3_SIZE (15 * 2 * 1024)
+// #define PART31_SIZE 0x5000
+// #define PART32_SIZE 0x5000
 
 #define MEMSIZE                                                                \
-  (PART1_SIZE + PART2_SIZE + PART3_SIZE + 3) // Size of Ram disk in sectors
+  (PART1_SIZE + PART2_SIZE + PART3_SIZE + 1) // Size of Ram disk in sectors
 static int my_major_number = 0;              // Variable for Major Number
 
 static PartTable def_part_table = {
@@ -95,7 +95,7 @@ static PartTable def_part_table = {
       start_sec : sec4size(PART1_SIZE + PART2_SIZE) + 1,
       start_cyl_hi : (cyl4size(PART1_SIZE + PART2_SIZE) >> 8) & 0x3,
       start_cyl : cyl4size(PART1_SIZE + PART2_SIZE) & 0xFF,
-      part_type : 0x05,
+      part_type : 0x83,
       end_sec : sec4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1) + 1,
       end_head : head4size(PART1_SIZE + PART2_SIZE + PART3_SIZE - 1),
       end_cyl_hi :
@@ -106,52 +106,53 @@ static PartTable def_part_table = {
     }};
 
 static unsigned int def_log_part_br_abs_start_sector[] = {
-    PART1_SIZE + PART2_SIZE + 1,
-    PART1_SIZE + PART2_SIZE + PART31_SIZE + 2,
+    // PART1_SIZE + PART2_SIZE + 1,
+    // PART1_SIZE + PART2_SIZE + PART31_SIZE + 2,
 };
 static const PartTable def_log_part_table[] = {
-    {{
-       boot_type : 0x00,
-       start_head : 0,
-       start_sec : 1,
-       start_cyl_hi : 0,
-       start_cyl : 0,
-       part_type : 0x83,
-       end_sec : sec4size(PART31_SIZE - 1) + 1,
-       end_head : head4size(PART31_SIZE - 1),
-       end_cyl_hi : (cyl4size(PART31_SIZE - 1) >> 8) & 0x3,
-       end_cyl : cyl4size(PART31_SIZE - 1) & 0xFF,
-       abs_start_sec : 0x1,
-       sec_in_part : PART31_SIZE
-     },
-     {
-       boot_type : 0x00,
-       start_head : sec4size(PART31_SIZE) + 1,
-       start_sec : head4size(PART31_SIZE),
-       start_cyl_hi : (cyl4size(PART31_SIZE) >> 8) & 0x3,
-       start_cyl : cyl4size(PART31_SIZE) & 0xFF,
-       part_type : 0x05,
-       end_sec : sec4size(PART31_SIZE + PART32_SIZE - 1) + 1,
-       end_head : head4size(PART31_SIZE + PART32_SIZE - 1),
-       end_cyl_hi : (cyl4size(PART31_SIZE + PART32_SIZE - 1) >> 8) & 0x3,
-       end_cyl : cyl4size(PART31_SIZE + PART32_SIZE - 1) & 0xFF,
-       abs_start_sec : PART31_SIZE + 1,
-       sec_in_part : PART32_SIZE
-     }},
-    {{
-      boot_type : 0x00,
-      start_head : 0,
-      start_sec : 0,
-      start_cyl_hi : 0,
-      start_cyl : 0,
-      part_type : 0x83,
-      end_sec : 0,
-      end_head : 0,
-      end_cyl_hi : 0,
-      end_cyl : 0,
-      abs_start_sec : 0x1,
-      sec_in_part : PART32_SIZE
-    }}};
+    // {{
+    //    boot_type : 0x00,
+    //    start_head : 0,
+    //    start_sec : 1,
+    //    start_cyl_hi : 0,
+    //    start_cyl : 0,
+    //    part_type : 0x83,
+    //    end_sec : sec4size(PART31_SIZE - 1) + 1,
+    //    end_head : head4size(PART31_SIZE - 1),
+    //    end_cyl_hi : (cyl4size(PART31_SIZE - 1) >> 8) & 0x3,
+    //    end_cyl : cyl4size(PART31_SIZE - 1) & 0xFF,
+    //    abs_start_sec : 0x1,
+    //    sec_in_part : PART31_SIZE
+    //  },
+    //  {
+    //    boot_type : 0x00,
+    //    start_head : sec4size(PART31_SIZE) + 1,
+    //    start_sec : head4size(PART31_SIZE),
+    //    start_cyl_hi : (cyl4size(PART31_SIZE) >> 8) & 0x3,
+    //    start_cyl : cyl4size(PART31_SIZE) & 0xFF,
+    //    part_type : 0x05,
+    //    end_sec : sec4size(PART31_SIZE + PART32_SIZE - 1) + 1,
+    //    end_head : head4size(PART31_SIZE + PART32_SIZE - 1),
+    //    end_cyl_hi : (cyl4size(PART31_SIZE + PART32_SIZE - 1) >> 8) & 0x3,
+    //    end_cyl : cyl4size(PART31_SIZE + PART32_SIZE - 1) & 0xFF,
+    //    abs_start_sec : PART31_SIZE + 1,
+    //    sec_in_part : PART32_SIZE
+    //  }},
+    // {{
+    //   boot_type : 0x00,
+    //   start_head : 0,
+    //   start_sec : 0,
+    //   start_cyl_hi : 0,
+    //   start_cyl : 0,
+    //   part_type : 0x83,
+    //   end_sec : 0,
+    //   end_head : 0,
+    //   end_cyl_hi : 0,
+    //   end_cyl : 0,
+    //   abs_start_sec : 0x1,
+    //   sec_in_part : PART32_SIZE
+    // }}
+};
 
 static void copy_mbr(u8 *disk) {
   memset(disk, 0x0, MBR_SIZE);
