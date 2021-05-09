@@ -1,9 +1,12 @@
 #include <linux/etherdevice.h>
 #include <linux/in.h>
+#include <linux/init.h>
 #include <linux/ip.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/netdevice.h>
+#include <linux/proc_fs.h>
 #include <linux/udp.h>
 #include <linux/version.h>
 #include <net/arp.h>
@@ -12,7 +15,13 @@ static char *link = "enp0s3";
 module_param(link, charp, 0);
 
 static char *ifname = "vni%d";
-static unsigned char data[1500];
+
+#define IPV4_STR_MAX_SIZE (sizeof("255.255.255.255"))
+static char saddr_buffer[IPV4_STR_MAX_SIZE];
+static char daddr_buffer[IPV4_STR_MAX_SIZE];
+
+static char log_buffer[4096];
+static size_t log_buffer_pos = 0;
 
 static struct net_device_stats stats;
 
@@ -22,31 +31,39 @@ struct priv {
 };
 
 static char check_frame(struct sk_buff *skb, unsigned char data_shift) {
-  unsigned char *user_data_ptr = NULL;
   struct iphdr *ip = (struct iphdr *)skb_network_header(skb);
-  struct udphdr *udp = NULL;
-  int data_len = 0;
 
-  if (IPPROTO_UDP == ip->protocol) {
-    udp = (struct udphdr *)((unsigned char *)ip + (ip->ihl * 4));
-    data_len = ntohs(udp->len) - sizeof(struct udphdr);
-    user_data_ptr = (unsigned char *)(skb->data + sizeof(struct iphdr) +
-                                      sizeof(struct udphdr)) +
-                    data_shift;
-    memcpy(data, user_data_ptr, data_len);
-    data[data_len] = '\0';
+  unsigned char s1 = 255 & (ntohl(ip->saddr) >> 24);
+  unsigned char s2 = 255 & (ntohl(ip->saddr) >> 16);
+  unsigned char s3 = 255 & (ntohl(ip->saddr) >> 8);
+  unsigned char s4 = 255 & (ntohl(ip->saddr));
+  unsigned char d1 = 255 & (ntohl(ip->daddr) >> 24);
+  unsigned char d2 = 255 & (ntohl(ip->daddr) >> 16);
+  unsigned char d3 = 255 & (ntohl(ip->daddr) >> 8);
+  unsigned char d4 = 255 & (ntohl(ip->daddr));
 
-    printk("Captured UDP datagram, saddr: %d.%d.%d.%d\n",
-           ntohl(ip->saddr) >> 24, (ntohl(ip->saddr) >> 16) & 0x00FF,
-           (ntohl(ip->saddr) >> 8) & 0x0000FF, (ntohl(ip->saddr)) & 0x000000FF);
-    printk("daddr: %d.%d.%d.%d\n", ntohl(ip->daddr) >> 24,
-           (ntohl(ip->daddr) >> 16) & 0x00FF,
-           (ntohl(ip->daddr) >> 8) & 0x0000FF, (ntohl(ip->daddr)) & 0x000000FF);
+  snprintf(saddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", s1, s2, s3, s4);
+  snprintf(daddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", d1, d2, d3, d4);
 
-    printk(KERN_INFO "Data length: %d. Data:", data_len);
-    printk("%s", data);
-    return 1;
+  printk(KERN_INFO "Captured IPv4 frame, saddr:%*s,\tdaddr:%*s\n",
+         (int)IPV4_STR_MAX_SIZE, saddr_buffer, (int)IPV4_STR_MAX_SIZE,
+         daddr_buffer);
+
+  /* Если буфер переполнен, сбрасываем его и записываем строку заново */
+  for (;;) {
+    size_t log_buffer_written = snprintf(
+        log_buffer + log_buffer_pos, sizeof(log_buffer) - log_buffer_pos,
+        "saddr:%*s\tdaddr:%*s\n", (int)IPV4_STR_MAX_SIZE, saddr_buffer,
+        (int)IPV4_STR_MAX_SIZE, daddr_buffer);
+
+    if (log_buffer_pos + log_buffer_written + 1 >= sizeof(log_buffer)) {
+      log_buffer_pos = 0;
+    } else {
+      log_buffer_pos += log_buffer_written;
+      break;
+    }
   }
+
   return 0;
 }
 
@@ -87,8 +104,8 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev) {
     skb->dev = priv->parent;
     skb->priority = 1;
     dev_queue_xmit(skb);
-    return 0;
   }
+
   return NETDEV_TX_OK;
 }
 
@@ -112,6 +129,27 @@ static void setup(struct net_device *dev) {
   for (i = 0; i < ETH_ALEN; i++)
     dev->dev_addr[i] = (char)i;
 }
+
+static ssize_t proc_read(struct file *f, char __user *ubuf, size_t count,
+                         loff_t *ppos) {
+  size_t len = log_buffer_pos - *ppos;
+  if (len > count)
+    len = count;
+  if (copy_to_user(ubuf, log_buffer + *ppos, len))
+    return -EFAULT;
+  *ppos += len;
+  return len;
+}
+
+static ssize_t proc_write(struct file *f, const char __user *ubuf, size_t count,
+                          loff_t *ppos) {
+  return -1;
+}
+
+static struct file_operations proc_fops = {
+    .owner = THIS_MODULE, .read = proc_read, .write = proc_write};
+
+static struct proc_dir_entry *proc_file = NULL;
 
 int __init lab3_init(void) {
   int err = 0;
@@ -148,6 +186,9 @@ int __init lab3_init(void) {
   rtnl_lock();
   netdev_rx_handler_register(priv->parent, &handle_frame, NULL);
   rtnl_unlock();
+
+  proc_file = proc_create("var2", 0444, NULL, &proc_fops);
+
   printk(KERN_INFO "Module %s loaded", THIS_MODULE->name);
   printk(KERN_INFO "%s: create link %s", THIS_MODULE->name, child->name);
   printk(KERN_INFO "%s: registered rx handler for %s", THIS_MODULE->name,
@@ -157,6 +198,10 @@ int __init lab3_init(void) {
 
 void __exit lab3_exit(void) {
   struct priv *priv = netdev_priv(child);
+
+  if (proc_file)
+    proc_remove(proc_file);
+
   if (priv->parent) {
     rtnl_lock();
     netdev_rx_handler_unregister(priv->parent);
@@ -172,6 +217,6 @@ void __exit lab3_exit(void) {
 module_init(lab3_init);
 module_exit(lab3_exit);
 
-MODULE_AUTHOR("Author");
+MODULE_AUTHOR("Anton Surkis");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Description");
+MODULE_DESCRIPTION("lab3");
