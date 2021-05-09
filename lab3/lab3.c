@@ -20,8 +20,9 @@ static char *ifname = "vni%d";
 static char saddr_buffer[IPV4_STR_MAX_SIZE];
 static char daddr_buffer[IPV4_STR_MAX_SIZE];
 
-static char log_buffer[4096];
-static size_t log_buffer_pos = 0;
+static char stat_buffer[4096];
+static size_t stat_buffer_len = 0;
+static int stat_buffer_outdated = 1;
 
 static struct net_device_stats stats;
 
@@ -30,7 +31,7 @@ struct priv {
   struct net_device *parent;
 };
 
-static char check_frame(struct sk_buff *skb, unsigned char data_shift) {
+static void check_frame(struct sk_buff *skb, unsigned char data_shift) {
   struct iphdr *ip = (struct iphdr *)skb_network_header(skb);
 
   unsigned char s1 = 255 & (ntohl(ip->saddr) >> 24);
@@ -48,32 +49,15 @@ static char check_frame(struct sk_buff *skb, unsigned char data_shift) {
   printk(KERN_INFO "Captured IPv4 frame, saddr:%*s,\tdaddr:%*s\n",
          (int)IPV4_STR_MAX_SIZE, saddr_buffer, (int)IPV4_STR_MAX_SIZE,
          daddr_buffer);
-
-  /* Если буфер переполнен, сбрасываем его и записываем строку заново */
-  for (;;) {
-    size_t log_buffer_written = snprintf(
-        log_buffer + log_buffer_pos, sizeof(log_buffer) - log_buffer_pos,
-        "saddr:%*s\tdaddr:%*s\n", (int)IPV4_STR_MAX_SIZE, saddr_buffer,
-        (int)IPV4_STR_MAX_SIZE, daddr_buffer);
-
-    if (log_buffer_pos + log_buffer_written + 1 >= sizeof(log_buffer)) {
-      log_buffer_pos = 0;
-    } else {
-      log_buffer_pos += log_buffer_written;
-      break;
-    }
-  }
-
-  return 0;
 }
 
 static rx_handler_result_t handle_frame(struct sk_buff **pskb) {
   // if (child) {
 
-  if (check_frame(*pskb, 0)) {
-    stats.rx_packets++;
-    stats.rx_bytes += (*pskb)->len;
-  }
+  check_frame(*pskb, 0);
+  stats.rx_packets++;
+  stats.rx_bytes += (*pskb)->len;
+  stat_buffer_outdated = 1;
   (*pskb)->dev = child;
   return RX_HANDLER_ANOTHER;
   //}
@@ -95,10 +79,10 @@ static int stop(struct net_device *dev) {
 static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev) {
   struct priv *priv = netdev_priv(dev);
 
-  if (check_frame(skb, 14)) {
-    stats.tx_packets++;
-    stats.tx_bytes += skb->len;
-  }
+  check_frame(skb, 14);
+  stats.tx_packets++;
+  stats.tx_bytes += skb->len;
+  stat_buffer_outdated = 1;
 
   if (priv->parent) {
     skb->dev = priv->parent;
@@ -132,10 +116,23 @@ static void setup(struct net_device *dev) {
 
 static ssize_t proc_read(struct file *f, char __user *ubuf, size_t count,
                          loff_t *ppos) {
-  size_t len = log_buffer_pos - *ppos;
+  size_t len;
+  if (stat_buffer_outdated) {
+    stat_buffer_len = snprintf(stat_buffer, sizeof(stat_buffer),
+                               "rx_packets : %lu\n"
+                               "rx_bytes   : %lu\n"
+                               "tx_packets : %lu\n"
+                               "tx_bytes   : %lu\n",
+                               stats.rx_packets, stats.rx_bytes,
+                               stats.tx_packets, stats.tx_bytes);
+    stat_buffer_outdated = 0;
+  }
+  len = stat_buffer_len + 1;
+  if (*ppos + len > sizeof(stat_buffer))
+    len = sizeof(stat_buffer) - *ppos;
   if (len > count)
     len = count;
-  if (copy_to_user(ubuf, log_buffer + *ppos, len))
+  if (copy_to_user(ubuf, stat_buffer + *ppos, len))
     return -EFAULT;
   *ppos += len;
   return len;
