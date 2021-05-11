@@ -40,17 +40,15 @@
 [ 3462.519239] IPv6: ADDRCONF(NETDEV_UP): vni0: link is not ready
 [ 3462.519275] vni0: device opened
 ```
+Работа сетевого интерфейса, перехватывающего все IPv4 пакеты, значительно ограничивает передачу и получение данных пользователем. Так, например, при использовании ping не будет получен Echo-Reply:
 
-`ping -4 -c 2 127.0.0.12` - отправка двух пакетов.
+`ping -4 -c 2 -I lo 127.0.0.12` - отправка двух пакетов. 
 
 ```
-PING 127.0.0.12 (127.0.0.12) 56(84) bytes of data.
-64 bytes from 127.0.0.12: icmp_seq=1 ttl=64 time=0.019 ms
-64 bytes from 127.0.0.12: icmp_seq=2 ttl=64 time=0.032 ms
+PING 127.0.0.12 (127.0.0.12) from 127.0.0.1 lo: 56(84) bytes of data.
 
--— 127.0.0.12 ping statistics —-
-2 packets transmitted, 2 received, 0% packet loss, time 1020ms
-rtt min/avg/max/mdev = 0.019/0.025/0.032/0.008 ms
+--- 127.0.0.12 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1020ms
 ```
 
 Вывод кольцевого буфера после перехвата пакетов:
