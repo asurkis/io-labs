@@ -33,8 +33,8 @@ struct priv {
 };
 
 static ssize_t lab1_dev_read(struct file *f, char __user *ubuf, size_t count,
-                             loff_t *ppos) { 
-  return -1; 
+                             loff_t *ppos) {
+  return -1;
 }
 
 static char current_mode = '1';
@@ -42,8 +42,10 @@ static char current_mode = '1';
 static ssize_t lab1_dev_write(struct file *f, const char __user *ubuf,
                               size_t count, loff_t *ppos) {
   char c;
-  if (!count) return 0;
-  if (*ppos) return 0;
+  if (!count)
+    return 0;
+  if (*ppos)
+    return 0;
 
   c = ubuf[0];
   switch (c) {
@@ -70,14 +72,16 @@ static void check_frame(struct sk_buff *skb, unsigned char data_shift) {
     unsigned char s3 = 255 & (ntohl(ip->saddr) >> 8);
     unsigned char s4 = 255 & (ntohl(ip->saddr));
     snprintf(saddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", s1, s2, s3, s4);
-    printk(KERN_INFO "Captured IPv4 frame, saddr:%*s", (int) IPV4_STR_MAX_SIZE, saddr_buffer);
+    printk(KERN_INFO "Captured IPv4 frame, saddr:%*s", (int)IPV4_STR_MAX_SIZE,
+           saddr_buffer);
   } else {
     unsigned char d1 = 255 & (ntohl(ip->daddr) >> 24);
     unsigned char d2 = 255 & (ntohl(ip->daddr) >> 16);
     unsigned char d3 = 255 & (ntohl(ip->daddr) >> 8);
     unsigned char d4 = 255 & (ntohl(ip->daddr));
     snprintf(daddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", d1, d2, d3, d4);
-    printk(KERN_INFO "Captured IPv4 frame, daddr:%*s", (int) IPV4_STR_MAX_SIZE, daddr_buffer);
+    printk(KERN_INFO "Captured IPv4 frame, daddr:%*s", (int)IPV4_STR_MAX_SIZE,
+           daddr_buffer);
   }
 }
 
