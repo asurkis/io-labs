@@ -1,3 +1,4 @@
+#include <linux/cdev.h>
 #include <linux/etherdevice.h>
 #include <linux/in.h>
 #include <linux/init.h>
@@ -31,24 +32,53 @@ struct priv {
   struct net_device *parent;
 };
 
+static ssize_t lab1_dev_read(struct file *f, char __user *ubuf, size_t count,
+                             loff_t *ppos) { 
+  return -1; 
+}
+
+static char current_mode = '1';
+
+static ssize_t lab1_dev_write(struct file *f, const char __user *ubuf,
+                              size_t count, loff_t *ppos) {
+  char c;
+  if (!count) return 0;
+  if (*ppos) return 0;
+
+  c = ubuf[0];
+  switch (c) {
+  case '1':
+  case '2':
+    current_mode = c;
+    break;
+  default:
+    return -1;
+  }
+
+  return count;
+}
+
+static struct file_operations lab1_dev_fops = {
+    .owner = THIS_MODULE, .read = lab1_dev_read, .write = lab1_dev_write};
+
 static void check_frame(struct sk_buff *skb, unsigned char data_shift) {
   struct iphdr *ip = (struct iphdr *)skb_network_header(skb);
 
-  unsigned char s1 = 255 & (ntohl(ip->saddr) >> 24);
-  unsigned char s2 = 255 & (ntohl(ip->saddr) >> 16);
-  unsigned char s3 = 255 & (ntohl(ip->saddr) >> 8);
-  unsigned char s4 = 255 & (ntohl(ip->saddr));
-  unsigned char d1 = 255 & (ntohl(ip->daddr) >> 24);
-  unsigned char d2 = 255 & (ntohl(ip->daddr) >> 16);
-  unsigned char d3 = 255 & (ntohl(ip->daddr) >> 8);
-  unsigned char d4 = 255 & (ntohl(ip->daddr));
-
-  snprintf(saddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", s1, s2, s3, s4);
-  snprintf(daddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", d1, d2, d3, d4);
-
-  printk(KERN_INFO "Captured IPv4 frame, saddr:%*s,\tdaddr:%*s\n",
-         (int)IPV4_STR_MAX_SIZE, saddr_buffer, (int)IPV4_STR_MAX_SIZE,
-         daddr_buffer);
+  if (current_mode == '1') {
+    unsigned char s1 = 255 & (ntohl(ip->saddr) >> 24);
+    unsigned char s2 = 255 & (ntohl(ip->saddr) >> 16);
+    unsigned char s3 = 255 & (ntohl(ip->saddr) >> 8);
+    unsigned char s4 = 255 & (ntohl(ip->saddr));
+    snprintf(saddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", s1, s2, s3, s4);
+    printk(KERN_INFO "Captured IPv4 frame, saddr:%*s", (int) IPV4_STR_MAX_SIZE, saddr_buffer);
+  } else {
+    unsigned char d1 = 255 & (ntohl(ip->daddr) >> 24);
+    unsigned char d2 = 255 & (ntohl(ip->daddr) >> 16);
+    unsigned char d3 = 255 & (ntohl(ip->daddr) >> 8);
+    unsigned char d4 = 255 & (ntohl(ip->daddr));
+    snprintf(daddr_buffer, IPV4_STR_MAX_SIZE, "%d.%d.%d.%d", d1, d2, d3, d4);
+    printk(KERN_INFO "Captured IPv4 frame, daddr:%*s", (int) IPV4_STR_MAX_SIZE, daddr_buffer);
+  }
 }
 
 static rx_handler_result_t handle_frame(struct sk_buff **pskb) {
@@ -148,9 +178,33 @@ static struct file_operations proc_fops = {
 
 static struct proc_dir_entry *proc_file = NULL;
 
+static dev_t dev;
+static struct cdev lab1_cdev[1];
+static struct class *c1;
+
+static char *devnode(struct device *dev, umode_t *mode) {
+  if (mode)
+    *mode = 0666;
+  return NULL;
+}
+
 int __init lab3_init(void) {
-  int err = 0;
   struct priv *priv;
+  int err = alloc_chrdev_region(&dev, 0, 1, "lab1_dev_driver");
+  if (err < 0)
+    return err;
+
+  if ((c1 = class_create(THIS_MODULE, "lab1_dev_driver_class")) == NULL)
+    return -1;
+
+  c1->devnode = devnode;
+  if (device_create(c1, NULL, dev, NULL, "var2") == NULL)
+    return -1;
+
+  cdev_init(&lab1_cdev[0], &lab1_dev_fops);
+  if (cdev_add(&lab1_cdev[0], dev, 2) < 0)
+    return -1;
+
   child = alloc_netdev(sizeof(struct priv), ifname, NET_NAME_UNKNOWN, setup);
   if (child == NULL) {
     printk(KERN_ERR "%s: allocate error", THIS_MODULE->name);
@@ -208,6 +262,11 @@ void __exit lab3_exit(void) {
   }
   unregister_netdev(child);
   free_netdev(child);
+
+  device_destroy(c1, dev);
+  class_destroy(c1);
+  unregister_chrdev_region(dev, 1);
+
   printk(KERN_INFO "Module %s unloaded", THIS_MODULE->name);
 }
 
